@@ -21,29 +21,25 @@ import CONFIG.*;
  */
 public class MyVM implements Runnable{
     // instance variables
-    private String vmName;
-    private ServiceInstance si;
+    //private static ServiceInstance si;
     private VirtualMachine vm;
     private HostSystem hostSystem;
+    private int deathCount = 0;
+    private boolean live = false;
+    private boolean poweredOn;
 
-    private String vHostIP;
-    private String url = "130.65.132.106";
-    private String userName = "administrator";
-    private String password = "12!@qwQW";
-    
+
     /**
      * Constructor for objects of class MyVM
      */
-    public MyVM(VirtualMachine vm,String vmName,HostSystem hostSystem, String vHostIP) {
+    public MyVM(VirtualMachine vm,HostSystem hostSystem) {
         // initialise instance variables
         try {
             // your code here
             this.vm = vm;
-            this.vmName = vmName;
-            this.vHostIP = vHostIP;
-            this.hostSystem = hostSystem;
-            
-            si = new ServiceInstance(new URL(url), userName, password, true);
+            this.hostSystem = hostSystem;;
+            VirtualMachineRuntimeInfo vmri = (VirtualMachineRuntimeInfo) vm.getRuntime();
+            poweredOn = vmri.getPowerState() == VirtualMachinePowerState.poweredOn;
             
         } catch (Exception e) {
             System.out.println(e.toString());
@@ -92,7 +88,7 @@ public class MyVM implements Runnable{
     public void takeSnapshot() {
         try {
             // your code here
-            Task task = vm.createSnapshot_Task(vmName + "_snapshot", "current", false, false);
+            Task task = vm.createSnapshot_Task(vm.getName() + "_snapshot", "current", false, false);
             if (task.waitForMe()==Task.SUCCESS) {
               System.out.println("Snapshot was created.");
             }
@@ -102,6 +98,35 @@ public class MyVM implements Runnable{
         }
     }
 
+    
+    public boolean isLive() {
+        return live;
+    }
+
+    public void setLive(boolean live) {
+        this.live = live;
+    }
+    
+    public void deathCountIncrement() {
+        deathCount++;
+    }
+    
+    public void deathCountReset() {
+        deathCount = 0;
+    }
+    
+    public int getDeathCount() {
+        return deathCount;
+    }
+
+    public boolean isPoweredOn() {
+        return poweredOn;
+    }
+
+    public void setPoweredOn(boolean poweredOn) {
+        this.poweredOn = poweredOn;
+    }
+    
     /**
      * revert to current snapshot
      */
