@@ -2,8 +2,10 @@ package cmpe283_project_1;
 
 import java.net.URL;
 
+import com.vmware.vim25.VirtualMachineMovePriority;
 import com.vmware.vim25.VirtualMachinePowerState;
 import com.vmware.vim25.VirtualMachineRuntimeInfo;
+import com.vmware.vim25.mo.ComputeResource;
 import com.vmware.vim25.mo.Folder;
 import com.vmware.vim25.mo.HostSystem;
 import com.vmware.vim25.mo.InventoryNavigator;
@@ -23,28 +25,55 @@ public class MyVM implements Runnable{
     // instance variables
     //private static ServiceInstance si;
     private VirtualMachine vm;
-    private HostSystem hostSystem;
+    private MyVHost myVHost;
     private int deathCount = 0;
     private boolean live = false;
-    private boolean poweredOn;
 
 
     /**
      * Constructor for objects of class MyVM
      */
-    public MyVM(VirtualMachine vm,HostSystem hostSystem) {
+    public MyVM(VirtualMachine vm,MyVHost myVHost) {
         // initialise instance variables
         try {
             // your code here
             this.vm = vm;
-            this.hostSystem = hostSystem;;
-            VirtualMachineRuntimeInfo vmri = (VirtualMachineRuntimeInfo) vm.getRuntime();
-            poweredOn = vmri.getPowerState() == VirtualMachinePowerState.poweredOn;
+            this.myVHost = myVHost;
             
         } catch (Exception e) {
             System.out.println(e.toString());
         }
 
+    }
+    
+    
+    public boolean isLive() {
+        return live;
+    }
+
+    public void setLive(boolean live) {
+        this.live = live;
+    }
+    
+    public void deathCountIncrement() {
+        deathCount++;
+    }
+    
+    public void deathCountReset() {
+        deathCount = 0;
+    }
+    
+    public int getDeathCount() {
+        return deathCount;
+    }
+
+    public String getVMIP() {
+        return vm.getGuest().getIpAddress();
+    }
+    
+    public boolean isPoweredOn() {
+        VirtualMachineRuntimeInfo vmri = (VirtualMachineRuntimeInfo) vm.getRuntime();
+        return vmri.getPowerState() == VirtualMachinePowerState.poweredOn;
     }
 
     /**
@@ -87,45 +116,17 @@ public class MyVM implements Runnable{
 
     public void takeSnapshot() {
         try {
-            // your code here
-            Task task = vm.createSnapshot_Task(vm.getName() + "_snapshot", "current", false, false);
-            if (task.waitForMe()==Task.SUCCESS) {
-              System.out.println("Snapshot was created.");
+            if (live) { 
+                Task task = vm.createSnapshot_Task(vm.getName() + "_snapshot", "current", false, false);
+                if (task.waitForMe()==Task.SUCCESS) {
+                  System.out.println("Snapshot was created.");
+                }
             }
             
         } catch (Exception e) {
             System.out.println(e.toString());
         }
-    }
-
-    
-    public boolean isLive() {
-        return live;
-    }
-
-    public void setLive(boolean live) {
-        this.live = live;
-    }
-    
-    public void deathCountIncrement() {
-        deathCount++;
-    }
-    
-    public void deathCountReset() {
-        deathCount = 0;
-    }
-    
-    public int getDeathCount() {
-        return deathCount;
-    }
-
-    public boolean isPoweredOn() {
-        return poweredOn;
-    }
-
-    public void setPoweredOn(boolean poweredOn) {
-        this.poweredOn = poweredOn;
-    }
+    }  
     
     /**
      * revert to current snapshot
@@ -133,7 +134,6 @@ public class MyVM implements Runnable{
 
     public void revertToCurrentSnapshot() {
         try {
-            // your code here
             Thread thread = new Thread(this);
             thread.start();
             
@@ -141,14 +141,42 @@ public class MyVM implements Runnable{
             System.out.println(e.toString());
         }
     }
+    
+    // migrate to a new host
+    public void migrateToAnotherHost(HostSystem newHost) {
+        try {
+            ComputeResource cr = (ComputeResource) newHost.getParent();
+            Task task = vm.migrateVM_Task(cr.getResourcePool(), newHost,
+                    VirtualMachineMovePriority.highPriority,
+                    VirtualMachinePowerState.poweredOff);
+            System.out.println("Try to migrate " + vm.getName() + " to "
+                    + newHost.getName());
+            if (task.waitForTask() == task.SUCCESS) {
+                System.out.println("\n Migrate virtual machine: "
+                        + vm.getName() + " successfully!");
+            } else {
+                System.out.println("\n Migrate vm failed!");
+            }
+        }catch(Exception e) {
+            e.printStackTrace();
+        }
+    }
 
+    // called by revertToCurrentSnapshot
     @Override
     public void run() {
         try {
-            // or null?
-            Task task = vm.revertToCurrentSnapshot_Task(hostSystem);
+            Task task = vm.revertToCurrentSnapshot_Task(myVHost.getHostSystem());
             if (task.waitForMe()==Task.SUCCESS) {
                 System.out.println("Revert susccessful.");
+            }else if (!myVHost.isLive()) {
+                // revert failed, check for vhosts
+                // look for available vhosts
+                new Thread(new HostPingMonitor()).run(); // execute this in the same thread
+                
+                
+            }else {
+                System.out.println("Revert to snapshot failed, but ping to vhost works");
             }
             
         } catch(Exception e) {

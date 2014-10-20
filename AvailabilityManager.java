@@ -1,6 +1,5 @@
 package cmpe283_project_1;
 
-import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -17,16 +16,14 @@ public class AvailabilityManager {
     // Global variable, contains all VM info
     // can be accessed by Availability.VMPOOL
     public static Map<String,MyVM> VM_POOL = new Hashtable<String,MyVM>();
-    private static ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(10);
-    
+    public static Map<String,MyVHost> VHOST_POOL = new Hashtable<String,MyVHost>();
     
     public static void main(String[] args) {
-        PingMonitor p = new PingMonitor();
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+        VMPingMonitor p = new VMPingMonitor();
         CachingManager m = new CachingManager();
         scheduler.scheduleAtFixedRate(p, 0, 10, SECONDS);
         scheduler.scheduleAtFixedRate(m, 0, 10, MINUTES);
-        
- 
     }
 
 }
